@@ -1,5 +1,5 @@
 /*
-  To upload through terminal you can use: curl -F "image=@firmware.bin" esp8266-webupdate.local/update
+  To upload through terminal you can use: curl -F "image=@firmware.bin" myhome.local/update
 */
 
 #include <ESP8266WiFi.h>
@@ -11,7 +11,7 @@
 #include "dht11.h"
 
 /* Global variables area */
-const char* host = "esp8266-webupdate";
+const char* host = "myhome";
 const char* ssid = "W04_14A51AEF9DAE";
 const char* password = "abh3r2y1mtig36e";
 
@@ -39,15 +39,12 @@ void readDhtData(dht11 *Dht) {
       break;
   }
 
-  //#define DISP_DHT_DATA
-#ifdef DISP_DHT_DATA
   Serial.print("DHT11, \t");
   Serial.print("OK,\t");
   Serial.print(Dht->humidity, 1);
   Serial.print(",\t");
   Serial.println(Dht->temperature, 1);
   delay(1000);
-#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -122,12 +119,8 @@ void drawGraph() {
   httpServer.send ( 200, "image/svg+xml", out);
 }
 
-/* Main functions area */
 ////////////////////////////////////////////////////////////////////////////////
-void setup(void) {
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println("Booting Sketch...");
+void connectWifi() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.begin(ssid, password);
 
@@ -140,7 +133,11 @@ void setup(void) {
   Serial.println ( ssid );
   Serial.print ( "IP address: " );
   Serial.println ( WiFi.localIP() );
+}
 
+////////////////////////////////////////////////////////////////////////////////
+void startWebUpdater() {
+  /* For Web Updater */
   MDNS.begin(host);
 
   httpUpdater.setup(&httpServer);
@@ -148,14 +145,10 @@ void setup(void) {
 
   MDNS.addService("http", "tcp", 80);
   Serial.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n\n", host);
+}
 
-  // without Web updater, this block is needed
-#ifdef ENB_WEB_UPDATER
-  if ( MDNS.begin ( "esp8266" ) ) {
-    Serial.println ( "MDNS responder started" );
-  }
-#endif
-
+////////////////////////////////////////////////////////////////////////////////
+void startHttpServer() {
   httpServer.on ( "/", handleRoot );
   httpServer.on ( "/test.svg", drawGraph );
   httpServer.on ( "/inline", []() {
@@ -164,6 +157,20 @@ void setup(void) {
   httpServer.onNotFound ( handleNotFound );
   httpServer.begin();
   Serial.println ( "HTTP server started" );
+}
+
+/* Main functions area */
+////////////////////////////////////////////////////////////////////////////////
+void setup(void) {
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println("Booting Sketch...");
+
+  connectWifi();
+
+  startWebUpdater();
+
+  startHttpServer();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
