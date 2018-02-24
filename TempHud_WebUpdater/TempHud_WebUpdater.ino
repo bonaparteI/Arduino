@@ -18,10 +18,50 @@ const char* password = "abh3r2y1mtig36e";
 ESP8266WebServer httpServer(80);
 ESP8266HTTPUpdateServer httpUpdater;
 
-const char DHT11_PIN = 2;
+const char DHT11_PIN = 0;
 
 /* Support functions area */
 ////////////////////////////////////////////////////////////////////////////////
+void connectWifi() {
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    WiFi.begin(ssid, password);
+    Serial.println("WiFi failed, retrying.");
+  }
+  Serial.println ( "" );
+  Serial.print ( "Connected to " );
+  Serial.println ( ssid );
+  Serial.print ( "IP address: " );
+  Serial.println ( WiFi.localIP() );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void startWebUpdater() {
+  /* For Web Updater */
+  MDNS.begin(host);
+
+  httpUpdater.setup(&httpServer);
+//  httpServer.begin();
+
+  MDNS.addService("http", "tcp", 80);
+  Serial.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n\n", host);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void startHttpServer() {
+  httpServer.on ( "/", handleRoot );
+  httpServer.on ( "/test.svg", drawGraph );
+  httpServer.on ( "/inline", []() {
+    httpServer.send ( 200, "text/plain", "this works as well" );
+  } );
+  httpServer.onNotFound ( handleNotFound );
+  httpServer.begin();
+  Serial.println ( "HTTP server started" );
+}
+
+////////////////////////////////////////
 void readDhtData(dht11 *Dht) {
   int chk;
   chk = Dht->read(DHT11_PIN);
@@ -47,8 +87,9 @@ void readDhtData(dht11 *Dht) {
   delay(1000);
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 void handleRoot() {
+  digitalWrite(LED_BUILTIN, LOW);
   char temp[400];
   int sec = millis() / 1000;
   int min = sec / 60;
@@ -80,9 +121,11 @@ void handleRoot() {
              hr, min % 60, sec % 60, DHT.temperature, DHT.humidity
            );
   httpServer.send ( 200, "text/html", temp );
+
+  digitalWrite(LED_BUILTIN, HIGH);
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 void handleNotFound() {
   String message = "File Not Found\n\n";
   message += "URI: ";
@@ -100,7 +143,7 @@ void handleNotFound() {
   httpServer.send ( 404, "text/plain", message );
 }
 
-////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////
 void drawGraph() {
   String out = "";
   char temp[100];
@@ -119,52 +162,15 @@ void drawGraph() {
   httpServer.send ( 200, "image/svg+xml", out);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-void connectWifi() {
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.begin(ssid, password);
-
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    WiFi.begin(ssid, password);
-    Serial.println("WiFi failed, retrying.");
-  }
-  Serial.println ( "" );
-  Serial.print ( "Connected to " );
-  Serial.println ( ssid );
-  Serial.print ( "IP address: " );
-  Serial.println ( WiFi.localIP() );
-}
-
-////////////////////////////////////////////////////////////////////////////////
-void startWebUpdater() {
-  /* For Web Updater */
-  MDNS.begin(host);
-
-  httpUpdater.setup(&httpServer);
-  httpServer.begin();
-
-  MDNS.addService("http", "tcp", 80);
-  Serial.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n\n", host);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-void startHttpServer() {
-  httpServer.on ( "/", handleRoot );
-  httpServer.on ( "/test.svg", drawGraph );
-  httpServer.on ( "/inline", []() {
-    httpServer.send ( 200, "text/plain", "this works as well" );
-  } );
-  httpServer.onNotFound ( handleNotFound );
-  httpServer.begin();
-  Serial.println ( "HTTP server started" );
-}
-
 /* Main functions area */
 ////////////////////////////////////////////////////////////////////////////////
 void setup(void) {
   Serial.begin(115200);
   Serial.println();
   Serial.println("Booting Sketch...");
+
+  // initialize digital pin LED_BUILTIN as an output.
+  pinMode(LED_BUILTIN, OUTPUT);
 
   connectWifi();
 
